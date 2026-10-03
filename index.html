@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#111418">
+  <title>Push/Pull Log</title>
+  <style>
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #15181c;
+  --muted: #6b7280;
+  --border: #d9dde3;
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --flag-bg: #dcfce7;
+  --flag-text: #166534;
+  --danger: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --card: #1b2026;
+    --text: #e8eaed;
+    --muted: #9aa3ae;
+    --border: #2e353e;
+    --accent: #5b8def;
+    --accent-text: #0b0e12;
+    --flag-bg: #14361f;
+    --flag-text: #86efac;
+    --danger: #f87171;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 22px; margin: 0 0 4px; }
+h3 { font-size: 16px; margin: 0; }
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+button, select, input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+nav { display: flex; gap: 6px; }
+nav button.active,
+.rotation button.next {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.rotation {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 12px 0;
+}
+.rotation button { padding: 8px 4px; font-size: 14px; }
+
+.muted { color: var(--muted); font-size: 14px; }
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  max-width: 100%;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card-head .target { white-space: nowrap; color: var(--muted); font-size: 14px; }
+
+.card select.swap { margin-top: 8px; width: 100%; }
+
+.flag {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--flag-bg);
+  color: var(--flag-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.prev { margin: 8px 0 10px; }
+
+.set {
+  display: grid;
+  grid-template-columns: 48px 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.set label { color: var(--muted); font-size: 14px; }
+
+.field { position: relative; }
+.field input {
+  width: 100%;
+  padding: 10px 40px 10px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 17px;
+}
+.field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.field span {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.primary {
+  width: 100%;
+  padding: 14px;
+  margin-top: 4px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.entry-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.entry-line { font-size: 14px; margin: 4px 0; }
+.entry-line b { font-weight: 600; }
+
+.link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  max-width: calc(100vw - 32px);
+}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Push/Pull Log</h1>
+    <nav>
+      <button data-view="workout" class="active">Workout</button>
+      <button data-view="history">History</button>
+    </nav>
+  </header>
+
+  <main id="workout"></main>
+  <main id="history" hidden></main>
+
+  <div id="toast" hidden></div>
+
+  <script>
+'use strict';
+
+// ---------- Program definition ----------
+
+const EXERCISES = {
+  chest_press:        { name: 'Machine chest press',            sets: 3, min: 8,  max: 12 },
+  db_shoulder_press:  { name: 'Seated dumbbell shoulder press', sets: 3, min: 8,  max: 12 },
+  cable_lateral:      { name: 'Cable lateral raise',            sets: 3, min: 12, max: 15 },
+  cable_pushdown:     { name: 'Cable triceps pushdown',         sets: 3, min: 10, max: 15 },
+
+  lat_pulldown:       { name: 'Lat pulldown',                   sets: 3, min: 8,  max: 12 },
+  cable_row:          { name: 'Seated cable row',               sets: 3, min: 8,  max: 12 },
+  face_pull:          { name: 'Cable face pull',                sets: 3, min: 12, max: 15 },
+  db_curl:            { name: 'Dumbbell curl',                  sets: 3, min: 10, max: 15 },
+
+  incline_machine:    { name: 'Incline machine press',          sets: 3, min: 8,  max: 12 },
+  incline_db:         { name: 'Incline dumbbell press',         sets: 3, min: 8,  max: 12 },
+  machine_shoulder:   { name: 'Machine shoulder press',         sets: 3, min: 8,  max: 12 },
+  db_lateral:         { name: 'Dumbbell lateral raise',         sets: 3, min: 12, max: 15 },
+  triceps_machine:    { name: 'Triceps extension machine',      sets: 3, min: 10, max: 15 },
+  rope_pushdown:      { name: 'Rope pushdown',                  sets: 3, min: 10, max: 15 },
+
+  row_machine:        { name: 'Chest-supported row (machine)',  sets: 3, min: 8,  max: 12 },
+  row_db:             { name: 'Chest-supported row (dumbbell)', sets: 3, min: 8,  max: 12 },
+  close_pulldown:     { name: 'Close-grip pulldown',            sets: 3, min: 8,  max: 12 },
+  neutral_pulldown:   { name: 'Neutral-grip pulldown',          sets: 3, min: 8,  max: 12 },
+  reverse_pec_deck:   { name: 'Reverse pec deck',               sets: 3, min: 12, max: 15 },
+  hammer_curl:        { name: 'Hammer curl',                    sets: 3, min: 10, max: 15 },
+
+  leg_press:          { name: 'Leg press',                      sets: 2, min: 8,  max: 12 },
+  calf_raise:         { name: 'Standing calf raise',            sets: 2, min: 8,  max: 12 },
+};
+
+// Each slot lists its options; first is the default, the rest are allowed swaps.
+const SESSIONS = [
+  { id: 'pushA', name: 'Push A', slots: [['chest_press'], ['db_shoulder_press'], ['cable_lateral'], ['cable_pushdown']] },
+  { id: 'pullA', name: 'Pull A', slots: [['lat_pulldown'], ['cable_row'], ['face_pull'], ['db_curl']] },
+  { id: 'pushB', name: 'Push B', slots: [['incline_machine', 'incline_db'], ['machine_shoulder'], ['db_lateral'], ['triceps_machine', 'rope_pushdown']] },
+  { id: 'pullB', name: 'Pull B', slots: [['row_machine', 'row_db'], ['close_pulldown', 'neutral_pulldown'], ['reverse_pec_deck'], ['hammer_curl']] },
+];
+
+const LEG_SLOTS = [['leg_press'], ['calf_raise']];
+
+// ---------- State ----------
+
+const STORAGE_KEY = 'pushpull-log-v1';
+
+const defaultState = () => ({
+  next: 0,          // index into SESSIONS
+  legDay: 'off',    // 'off' | 'pullA' | 'pullB'
+  swaps: {},        // 'sessionId:slotIndex' -> exercise id
+  draft: {},        // exercise id -> [{ w, r }] (raw input strings)
+  history: [],      // [{ id, date, session, exercises: [{ id, sets: [{ w, r }] }] }]
+});
+
+let state = load();
+
+function load() {
+  try {
+    return { ...defaultState(), ...JSON.parse(localStorage.getItem(STORAGE_KEY)) };
+  } catch {
+    return defaultState();
+  }
+}
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// ---------- Logic ----------
+
+function currentExercises() {
+  const session = SESSIONS[state.next];
+  const slots = session.slots.map((options, i) => ({ key: `${session.id}:${i}`, options }));
+  if (state.legDay === session.id) {
+    LEG_SLOTS.forEach((options, i) => slots.push({ key: `legs:${i}`, options }));
+  }
+  return slots.map(slot => {
+    const chosen = state.swaps[slot.key];
+    return { ...slot, id: slot.options.includes(chosen) ? chosen : slot.options[0] };
+  });
+}
+
+function lastLog(exId) {
+  for (let i = state.history.length - 1; i >= 0; i--) {
+    const found = state.history[i].exercises.find(e => e.id === exId);
+    if (found) return { date: state.history[i].date, sets: found.sets };
+  }
+  return null;
+}
+
+// Rule 3: all prescribed sets at the top of the rep range.
+function readyForIncrease(exId, sets) {
+  const ex = EXERCISES[exId];
+  return sets.length >= ex.sets && sets.every(s => s.r >= ex.max);
+}
+
+function parseNum(str) {
+  const n = parseFloat(String(str).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+function loggedSets(exId) {
+  return (state.draft[exId] || [])
+    .map(s => ({ w: parseNum(s.w) ?? 0, r: parseNum(s.r) }))
+    .filter(s => s.r !== null && s.r > 0);
+}
+
+function draftFor(exId) {
+  if (!state.draft[exId]) {
+    const last = lastLog(exId);
+    const keepWeight = last && !readyForIncrease(exId, last.sets);
+    state.draft[exId] = Array.from({ length: EXERCISES[exId].sets }, (_, i) => {
+      const prev = last && (last.sets[i] || last.sets[last.sets.length - 1]);
+      return { w: keepWeight ? String(prev.w) : '', r: '' };
+    });
+  }
+  return state.draft[exId];
+}
+
+function finishSession() {
+  const exercises = currentExercises()
+    .map(e => ({ id: e.id, sets: loggedSets(e.id) }))
+    .filter(e => e.sets.length);
+  if (!exercises.length) return toast('Log at least one set first');
+
+  const session = SESSIONS[state.next];
+  state.history.push({ id: Date.now(), date: new Date().toISOString(), session: session.id, exercises });
+  state.next = (state.next + 1) % SESSIONS.length;
+  state.draft = {};
+  save();
+  renderWorkout();
+  window.scrollTo(0, 0);
+  toast(`${session.name} saved. Next: ${SESSIONS[state.next].name}`);
+}
+
+// ---------- Rendering ----------
+
+const $workout = document.getElementById('workout');
+const $history = document.getElementById('history');
+
+const fmtDate = iso => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+const fmtSets = sets => sets.map(s => `${s.w}×${s.r}`).join(', ');
+const sessionName = id => (SESSIONS.find(s => s.id === id) || { name: id }).name;
+
+function renderWorkout() {
+  const session = SESSIONS[state.next];
+
+  const rotation = SESSIONS.map((s, i) =>
+    `<button data-next="${i}" class="${i === state.next ? 'next' : ''}">${s.name}</button>`).join('');
+
+  const legOptions = [['off', 'Off'], ['pullA', 'On Pull A'], ['pullB', 'On Pull B']].map(([v, label]) =>
+    `<option value="${v}" ${state.legDay === v ? 'selected' : ''}>${label}</option>`).join('');
+
+  const cards = currentExercises().map(slot => {
+    const ex = EXERCISES[slot.id];
+    const last = lastLog(slot.id);
+    const flagged = last && readyForIncrease(slot.id, last.sets);
+    const draft = draftFor(slot.id);
+
+    const swap = slot.options.length > 1
+      ? `<select class="swap" data-swap="${slot.key}">${slot.options.map(id =>
+          `<option value="${id}" ${id === slot.id ? 'selected' : ''}>${EXERCISES[id].name}</option>`).join('')}</select>`
+      : '';
+
+    const rows = draft.map((set, i) => {
+      const prev = last && last.sets[i];
+      return `
+        <div class="set">
+          <label>Set ${i + 1}</label>
+          <div class="field">
+            <input type="text" inputmode="decimal" data-ex="${slot.id}" data-set="${i}" data-field="w"
+                   value="${set.w}" placeholder="${prev ? prev.w : ''}">
+            <span>kg</span>
+          </div>
+          <div class="field">
+            <input type="text" inputmode="numeric" data-ex="${slot.id}" data-set="${i}" data-field="r"
+                   value="${set.r}" placeholder="${prev && !flagged ? prev.r : ex.min}">
+            <span>reps</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <section class="card">
+        <div class="card-head">
+          <h3>${ex.name}</h3>
+          <span class="target">${ex.sets} × ${ex.min}–${ex.max}</span>
+        </div>
+        ${swap}
+        ${flagged ? '<div class="flag">↑ Increase weight today</div>' : ''}
+        <div class="prev muted">${last ? `Last (${fmtDate(last.date)}): ${fmtSets(last.sets)} kg` : 'No previous log'}</div>
+        ${rows}
+        <div class="flag" data-hint="${slot.id}" hidden>All sets at ${ex.max} — increase weight next time</div>
+      </section>`;
+  }).join('');
+
+  $workout.innerHTML = `
+    <h2>${session.name}</h2>
+    <div class="muted">Next in rotation. Tap another to override.</div>
+    <div class="rotation">${rotation}</div>
+    <div class="option">
+      <label for="legDay">Leg add-on (leg press, calf raise)</label>
+      <select id="legDay">${legOptions}</select>
+    </div>
+    ${cards}
+    <button class="primary" id="finish">Finish session</button>`;
+
+  currentExercises().forEach(e => updateHint(e.id));
+  save();
+}
+
+function updateHint(exId) {
+  const hint = $workout.querySelector(`[data-hint="${exId}"]`);
+  if (hint) hint.hidden = !readyForIncrease(exId, loggedSets(exId));
+}
+
+function renderHistory() {
+  const entries = state.history.slice().reverse().map(entry => `
+    <section class="card">
+      <div class="entry-head">
+        <h3>${sessionName(entry.session)} <span class="muted">${fmtDate(entry.date)}</span></h3>
+        <button class="link" data-delete="${entry.id}">Delete</button>
+      </div>
+      ${entry.exercises.map(e =>
+        `<div class="entry-line"><b>${EXERCISES[e.id] ? EXERCISES[e.id].name : e.id}</b><br>${fmtSets(e.sets)} kg</div>`).join('')}
+    </section>`).join('');
+
+  $history.innerHTML = `
+    ${entries || '<p class="muted">No sessions logged yet.</p>'}
+    <div class="data-actions">
+      <button id="export">Export backup</button>
+      <button id="import">Import backup</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>`;
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2500);
+}
+
+// ---------- Events ----------
+
+document.querySelector('nav').addEventListener('click', e => {
+  const view = e.target.dataset.view;
+  if (!view) return;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b === e.target));
+  $workout.hidden = view !== 'workout';
+  $history.hidden = view !== 'history';
+  view === 'workout' ? renderWorkout() : renderHistory();
+});
+
+$workout.addEventListener('input', e => {
+  const { ex, set, field } = e.target.dataset;
+  if (!ex) return;
+  state.draft[ex][set][field] = e.target.value;
+  save();
+  updateHint(ex);
+});
+
+$workout.addEventListener('change', e => {
+  if (e.target.id === 'legDay') {
+    state.legDay = e.target.value;
+    renderWorkout();
+  } else if (e.target.dataset.swap) {
+    state.swaps[e.target.dataset.swap] = e.target.value;
+    renderWorkout();
+  }
+});
+
+$workout.addEventListener('click', e => {
+  if (e.target.id === 'finish') {
+    finishSession();
+  } else if (e.target.dataset.next !== undefined) {
+    state.next = Number(e.target.dataset.next);
+    renderWorkout();
+  }
+});
+
+$history.addEventListener('click', e => {
+  if (e.target.dataset.delete) {
+    if (!confirm('Delete this session?')) return;
+    state.history = state.history.filter(h => String(h.id) !== e.target.dataset.delete);
+    state.draft = {}; // prefilled weights may depend on the deleted session
+    save();
+    renderHistory();
+  } else if (e.target.id === 'export') {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `pushpull-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } else if (e.target.id === 'import') {
+    document.getElementById('importFile').click();
+  }
+});
+
+$history.addEventListener('change', async e => {
+  if (e.target.id !== 'importFile' || !e.target.files[0]) return;
+  try {
+    const data = JSON.parse(await e.target.files[0].text());
+    if (!Array.isArray(data.history)) throw new Error('missing history');
+    if (!confirm(`Replace current data with backup (${data.history.length} sessions)?`)) return;
+    state = { ...defaultState(), ...data };
+    save();
+    renderHistory();
+    toast('Backup imported');
+  } catch (err) {
+    toast(`Import failed: ${err.message}`);
+  }
+});
+
+renderWorkout();
+  </script>
+</body>
+</html>
