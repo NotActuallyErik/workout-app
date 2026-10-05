@@ -133,6 +133,7 @@ select {
 .card-head .target { white-space: nowrap; color: var(--muted); font-size: 14px; }
 
 .card select.swap { margin-top: 8px; width: 100%; }
+.card select.swap + .link { display: block; margin-top: 6px; }
 
 .flag {
   display: inline-block;
@@ -240,44 +241,71 @@ select {
 
 // ---------- Program definition ----------
 
-const EXERCISES = {
-  chest_press:        { name: 'Machine chest press',            sets: 3, min: 8,  max: 12 },
-  db_shoulder_press:  { name: 'Seated dumbbell shoulder press', sets: 3, min: 8,  max: 12 },
-  cable_lateral:      { name: 'Cable lateral raise',            sets: 3, min: 12, max: 15 },
-  cable_pushdown:     { name: 'Cable triceps pushdown',         sets: 3, min: 10, max: 15 },
-
-  lat_pulldown:       { name: 'Lat pulldown',                   sets: 3, min: 8,  max: 12 },
-  cable_row:          { name: 'Seated cable row',               sets: 3, min: 8,  max: 12 },
-  face_pull:          { name: 'Cable face pull',                sets: 3, min: 12, max: 15 },
-  db_curl:            { name: 'Dumbbell curl',                  sets: 3, min: 10, max: 15 },
-
-  incline_machine:    { name: 'Incline machine press',          sets: 3, min: 8,  max: 12 },
-  incline_db:         { name: 'Incline dumbbell press',         sets: 3, min: 8,  max: 12 },
-  machine_shoulder:   { name: 'Machine shoulder press',         sets: 3, min: 8,  max: 12 },
-  db_lateral:         { name: 'Dumbbell lateral raise',         sets: 3, min: 12, max: 15 },
-  triceps_machine:    { name: 'Triceps extension machine',      sets: 3, min: 10, max: 15 },
-  rope_pushdown:      { name: 'Rope pushdown',                  sets: 3, min: 10, max: 15 },
-
-  row_machine:        { name: 'Chest-supported row (machine)',  sets: 3, min: 8,  max: 12 },
-  row_db:             { name: 'Chest-supported row (dumbbell)', sets: 3, min: 8,  max: 12 },
-  close_pulldown:     { name: 'Close-grip pulldown',            sets: 3, min: 8,  max: 12 },
-  neutral_pulldown:   { name: 'Neutral-grip pulldown',          sets: 3, min: 8,  max: 12 },
-  reverse_pec_deck:   { name: 'Reverse pec deck',               sets: 3, min: 12, max: 15 },
-  hammer_curl:        { name: 'Hammer curl',                    sets: 3, min: 10, max: 15 },
-
-  leg_press:          { name: 'Leg press',                      sets: 2, min: 8,  max: 12 },
-  calf_raise:         { name: 'Standing calf raise',            sets: 2, min: 8,  max: 12 },
+const GROUPS = {
+  chest: 'Chest', shoulders: 'Shoulders', side_delts: 'Side delts', triceps: 'Triceps',
+  lats: 'Lats', rows: 'Rows', rear_delts: 'Rear delts', biceps: 'Biceps',
+  legs: 'Legs', calves: 'Calves',
 };
 
-// Each slot lists its options; first is the default, the rest are allowed swaps.
+const EXERCISES = {
+  chest_press:        { group: 'chest',      name: 'Machine chest press',            sets: 3, min: 8,  max: 12 },
+  incline_machine:    { group: 'chest',      name: 'Incline machine press',          sets: 3, min: 8,  max: 12 },
+  incline_db:         { group: 'chest',      name: 'Incline dumbbell press',         sets: 3, min: 8,  max: 12 },
+  db_bench:           { group: 'chest',      name: 'Dumbbell bench press',           sets: 3, min: 8,  max: 12 },
+  pec_deck:           { group: 'chest',      name: 'Pec deck',                       sets: 3, min: 10, max: 15 },
+  cable_fly:          { group: 'chest',      name: 'Cable fly',                      sets: 3, min: 10, max: 15 },
+
+  db_shoulder_press:  { group: 'shoulders',  name: 'Seated dumbbell shoulder press', sets: 3, min: 8,  max: 12 },
+  machine_shoulder:   { group: 'shoulders',  name: 'Machine shoulder press',         sets: 3, min: 8,  max: 12 },
+  arnold_press:       { group: 'shoulders',  name: 'Arnold press',                   sets: 3, min: 8,  max: 12 },
+
+  cable_lateral:      { group: 'side_delts', name: 'Cable lateral raise',            sets: 3, min: 12, max: 15 },
+  db_lateral:         { group: 'side_delts', name: 'Dumbbell lateral raise',         sets: 3, min: 12, max: 15 },
+  machine_lateral:    { group: 'side_delts', name: 'Machine lateral raise',          sets: 3, min: 12, max: 15 },
+
+  cable_pushdown:     { group: 'triceps',    name: 'Cable triceps pushdown',         sets: 3, min: 10, max: 15 },
+  triceps_machine:    { group: 'triceps',    name: 'Triceps extension machine',      sets: 3, min: 10, max: 15 },
+  rope_pushdown:      { group: 'triceps',    name: 'Rope pushdown',                  sets: 3, min: 10, max: 15 },
+  overhead_ext:       { group: 'triceps',    name: 'Overhead cable extension',       sets: 3, min: 10, max: 15 },
+
+  lat_pulldown:       { group: 'lats',       name: 'Lat pulldown',                   sets: 3, min: 8,  max: 12 },
+  close_pulldown:     { group: 'lats',       name: 'Close-grip pulldown',            sets: 3, min: 8,  max: 12 },
+  neutral_pulldown:   { group: 'lats',       name: 'Neutral-grip pulldown',          sets: 3, min: 8,  max: 12 },
+  assisted_pullup:    { group: 'lats',       name: 'Assisted pull-up',               sets: 3, min: 8,  max: 12 },
+
+  cable_row:          { group: 'rows',       name: 'Seated cable row',               sets: 3, min: 8,  max: 12 },
+  row_machine:        { group: 'rows',       name: 'Chest-supported row (machine)',  sets: 3, min: 8,  max: 12 },
+  row_db:             { group: 'rows',       name: 'Chest-supported row (dumbbell)', sets: 3, min: 8,  max: 12 },
+  single_arm_row:     { group: 'rows',       name: 'Single-arm dumbbell row',        sets: 3, min: 8,  max: 12 },
+
+  face_pull:          { group: 'rear_delts', name: 'Cable face pull',                sets: 3, min: 12, max: 15 },
+  reverse_pec_deck:   { group: 'rear_delts', name: 'Reverse pec deck',               sets: 3, min: 12, max: 15 },
+  rear_delt_fly:      { group: 'rear_delts', name: 'Rear delt cable fly',            sets: 3, min: 12, max: 15 },
+
+  db_curl:            { group: 'biceps',     name: 'Dumbbell curl',                  sets: 3, min: 10, max: 15 },
+  hammer_curl:        { group: 'biceps',     name: 'Hammer curl',                    sets: 3, min: 10, max: 15 },
+  cable_curl:         { group: 'biceps',     name: 'Cable curl',                     sets: 3, min: 10, max: 15 },
+  preacher_curl:      { group: 'biceps',     name: 'Preacher curl machine',          sets: 3, min: 10, max: 15 },
+
+  leg_press:          { group: 'legs',       name: 'Leg press',                      sets: 2, min: 8,  max: 12 },
+  hack_squat:         { group: 'legs',       name: 'Hack squat',                     sets: 2, min: 8,  max: 12 },
+  leg_extension:      { group: 'legs',       name: 'Leg extension',                  sets: 2, min: 10, max: 15 },
+
+  calf_raise:         { group: 'calves',     name: 'Standing calf raise',            sets: 2, min: 8,  max: 12 },
+  seated_calf_raise:  { group: 'calves',     name: 'Seated calf raise',              sets: 2, min: 8,  max: 12 },
+};
+
+// Each slot names its default exercise; it can be swapped for any exercise in the same group.
 const SESSIONS = [
-  { id: 'pushA', name: 'Push A', slots: [['chest_press'], ['db_shoulder_press'], ['cable_lateral'], ['cable_pushdown']] },
-  { id: 'pullA', name: 'Pull A', slots: [['lat_pulldown'], ['cable_row'], ['face_pull'], ['db_curl']] },
-  { id: 'pushB', name: 'Push B', slots: [['incline_machine', 'incline_db'], ['machine_shoulder'], ['db_lateral'], ['triceps_machine', 'rope_pushdown']] },
-  { id: 'pullB', name: 'Pull B', slots: [['row_machine', 'row_db'], ['close_pulldown', 'neutral_pulldown'], ['reverse_pec_deck'], ['hammer_curl']] },
+  { id: 'pushA', name: 'Push A', slots: ['chest_press', 'db_shoulder_press', 'cable_lateral', 'cable_pushdown'] },
+  { id: 'pullA', name: 'Pull A', slots: ['lat_pulldown', 'cable_row', 'face_pull', 'db_curl'] },
+  { id: 'pushB', name: 'Push B', slots: ['incline_machine', 'machine_shoulder', 'db_lateral', 'triceps_machine'] },
+  { id: 'pullB', name: 'Pull B', slots: ['row_machine', 'close_pulldown', 'reverse_pec_deck', 'hammer_curl'] },
 ];
 
-const LEG_SLOTS = [['leg_press'], ['calf_raise']];
+const LEG_SLOTS = ['leg_press', 'calf_raise'];
+
+const ADD_CUSTOM = '__add';
 
 // ---------- State ----------
 
@@ -287,6 +315,7 @@ const defaultState = () => ({
   next: 0,          // index into SESSIONS
   legDay: 'off',    // 'off' | 'pullA' | 'pullB'
   swaps: {},        // 'sessionId:slotIndex' -> exercise id
+  custom: {},       // exercise id -> { group, name, sets, min, max, hidden? }
   draft: {},        // exercise id -> [{ w, r }] (raw input strings)
   history: [],      // [{ id, date, session, exercises: [{ id, sets: [{ w, r }] }] }]
 });
@@ -307,16 +336,37 @@ function save() {
 
 // ---------- Logic ----------
 
+const exDef = id => EXERCISES[id] || state.custom[id];
+
+function groupExercises(group) {
+  const builtIn = Object.keys(EXERCISES).filter(id => EXERCISES[id].group === group);
+  const custom = Object.keys(state.custom).filter(id => state.custom[id].group === group && !state.custom[id].hidden);
+  return builtIn.concat(custom);
+}
+
 function currentExercises() {
   const session = SESSIONS[state.next];
-  const slots = session.slots.map((options, i) => ({ key: `${session.id}:${i}`, options }));
+  const slots = session.slots.map((def, i) => ({ key: `${session.id}:${i}`, def }));
   if (state.legDay === session.id) {
-    LEG_SLOTS.forEach((options, i) => slots.push({ key: `legs:${i}`, options }));
+    LEG_SLOTS.forEach((def, i) => slots.push({ key: `legs:${i}`, def }));
   }
   return slots.map(slot => {
+    const group = EXERCISES[slot.def].group;
+    const options = groupExercises(group);
     const chosen = state.swaps[slot.key];
-    return { ...slot, id: slot.options.includes(chosen) ? chosen : slot.options[0] };
+    return { key: slot.key, group, options, id: options.includes(chosen) ? chosen : slot.def };
   });
+}
+
+// New exercise inherits sets and rep range from the one it replaces.
+function addCustom(slotKey) {
+  const slot = currentExercises().find(s => s.key === slotKey);
+  const name = (prompt(`Name of new ${GROUPS[slot.group].toLowerCase()} exercise:`) || '').trim();
+  if (!name) return;
+  const { sets, min, max } = exDef(slot.id);
+  const id = `custom_${Date.now()}`;
+  state.custom[id] = { group: slot.group, name, sets, min, max };
+  state.swaps[slotKey] = id;
 }
 
 function lastLog(exId) {
@@ -329,7 +379,7 @@ function lastLog(exId) {
 
 // Rule 3: all prescribed sets at the top of the rep range.
 function readyForIncrease(exId, sets) {
-  const ex = EXERCISES[exId];
+  const ex = exDef(exId);
   return sets.length >= ex.sets && sets.every(s => s.r >= ex.max);
 }
 
@@ -348,7 +398,7 @@ function draftFor(exId) {
   if (!state.draft[exId]) {
     const last = lastLog(exId);
     const keepWeight = last && !readyForIncrease(exId, last.sets);
-    state.draft[exId] = Array.from({ length: EXERCISES[exId].sets }, (_, i) => {
+    state.draft[exId] = Array.from({ length: exDef(exId).sets }, (_, i) => {
       const prev = last && (last.sets[i] || last.sets[last.sets.length - 1]);
       return { w: keepWeight ? String(prev.w) : '', r: '' };
     });
@@ -379,6 +429,7 @@ const $history = document.getElementById('history');
 
 const fmtDate = iso => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtSets = sets => sets.map(s => `${s.w}×${s.r}`).join(', ');
+const esc = str => String(str).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sessionName = id => (SESSIONS.find(s => s.id === id) || { name: id }).name;
 
 function renderWorkout() {
@@ -391,15 +442,18 @@ function renderWorkout() {
     `<option value="${v}" ${state.legDay === v ? 'selected' : ''}>${label}</option>`).join('');
 
   const cards = currentExercises().map(slot => {
-    const ex = EXERCISES[slot.id];
+    const ex = exDef(slot.id);
     const last = lastLog(slot.id);
     const flagged = last && readyForIncrease(slot.id, last.sets);
     const draft = draftFor(slot.id);
 
-    const swap = slot.options.length > 1
-      ? `<select class="swap" data-swap="${slot.key}">${slot.options.map(id =>
-          `<option value="${id}" ${id === slot.id ? 'selected' : ''}>${EXERCISES[id].name}</option>`).join('')}</select>`
-      : '';
+    const swap = `
+      <select class="swap" data-swap="${slot.key}">
+        <optgroup label="${GROUPS[slot.group]}">${slot.options.map(id =>
+          `<option value="${id}" ${id === slot.id ? 'selected' : ''}>${esc(exDef(id).name)}</option>`).join('')}</optgroup>
+        <option value="${ADD_CUSTOM}">+ Add your own…</option>
+      </select>
+      ${state.custom[slot.id] ? `<button class="link" data-remove="${slot.id}">Remove custom exercise</button>` : ''}`;
 
     const rows = draft.map((set, i) => {
       const prev = last && last.sets[i];
@@ -422,7 +476,7 @@ function renderWorkout() {
     return `
       <section class="card">
         <div class="card-head">
-          <h3>${ex.name}</h3>
+          <h3>${esc(ex.name)}</h3>
           <span class="target">${ex.sets} × ${ex.min}–${ex.max}</span>
         </div>
         ${swap}
@@ -461,7 +515,7 @@ function renderHistory() {
         <button class="link" data-delete="${entry.id}">Delete</button>
       </div>
       ${entry.exercises.map(e =>
-        `<div class="entry-line"><b>${EXERCISES[e.id] ? EXERCISES[e.id].name : e.id}</b><br>${fmtSets(e.sets)} kg</div>`).join('')}
+        `<div class="entry-line"><b>${esc(exDef(e.id) ? exDef(e.id).name : e.id)}</b><br>${fmtSets(e.sets)} kg</div>`).join('')}
     </section>`).join('');
 
   $history.innerHTML = `
@@ -506,7 +560,8 @@ $workout.addEventListener('change', e => {
     state.legDay = e.target.value;
     renderWorkout();
   } else if (e.target.dataset.swap) {
-    state.swaps[e.target.dataset.swap] = e.target.value;
+    if (e.target.value === ADD_CUSTOM) addCustom(e.target.dataset.swap);
+    else state.swaps[e.target.dataset.swap] = e.target.value;
     renderWorkout();
   }
 });
@@ -516,6 +571,10 @@ $workout.addEventListener('click', e => {
     finishSession();
   } else if (e.target.dataset.next !== undefined) {
     state.next = Number(e.target.dataset.next);
+    renderWorkout();
+  } else if (e.target.dataset.remove) {
+    if (!confirm('Remove this exercise from the list? Logged sessions are kept.')) return;
+    state.custom[e.target.dataset.remove].hidden = true; // kept so history still shows its name
     renderWorkout();
   }
 });
