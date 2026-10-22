@@ -208,6 +208,27 @@ select {
 
 .data-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 
+nav button { padding: 8px 10px; }
+
+.edit-set { grid-template-columns: 48px 1fr 1fr 32px; }
+.edit-set .link, .add-set { color: var(--muted); }
+.add-set { margin-top: 4px; }
+
+.weight-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.weight-form input[type=date] {
+  width: 100%; padding: 10px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 8px; font-size: 17px;
+}
+.chart { width: 100%; height: auto; margin: 12px 0; }
+.chart polyline { fill: none; stroke: var(--accent); stroke-width: 2; }
+.chart circle { fill: var(--accent); }
+.chart text { fill: var(--muted); font-size: 11px; }
+.w-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.w-row:last-child { border-bottom: 0; }
+.w-actions { display: flex; gap: 12px; }
+.w-actions .link { color: var(--muted); }
+.w-actions .link.del { color: var(--danger); }
+
 #toast {
   position: fixed;
   left: 50%;
@@ -228,11 +249,13 @@ select {
     <nav>
       <button data-view="workout" class="active">Workout</button>
       <button data-view="history">History</button>
+      <button data-view="weight">Weight</button>
     </nav>
   </header>
 
   <main id="workout"></main>
   <main id="history" hidden></main>
+  <main id="weight" hidden></main>
 
   <div id="toast" hidden></div>
 
@@ -244,8 +267,17 @@ select {
 const GROUPS = {
   chest: 'Chest', shoulders: 'Shoulders', side_delts: 'Side delts', triceps: 'Triceps',
   lats: 'Lats', rows: 'Rows', rear_delts: 'Rear delts', biceps: 'Biceps',
-  legs: 'Legs', calves: 'Calves',
+  legs: 'Legs', calves: 'Calves', forearms: 'Forearms', traps: 'Traps', abs: 'Abs',
 };
+
+// Add-exercise picker: category -> muscle groups shown under it.
+const CATEGORIES = [
+  ['Chest', ['chest']],
+  ['Shoulders', ['shoulders', 'side_delts']],
+  ['Arms', ['triceps', 'biceps', 'forearms']],
+  ['Back', ['lats', 'rows', 'rear_delts', 'traps']],
+  ['Misc', ['legs', 'calves', 'abs']],
+];
 
 const EXERCISES = {
   chest_press:        { group: 'chest',      name: 'Machine chest press',            sets: 3, min: 8,  max: 12 },
@@ -254,10 +286,14 @@ const EXERCISES = {
   db_bench:           { group: 'chest',      name: 'Dumbbell bench press',           sets: 3, min: 8,  max: 12 },
   pec_deck:           { group: 'chest',      name: 'Pec deck',                       sets: 3, min: 10, max: 15 },
   cable_fly:          { group: 'chest',      name: 'Cable fly',                      sets: 3, min: 10, max: 15 },
+  barbell_bench:      { group: 'chest',      name: 'Barbell bench press',            sets: 3, min: 6,  max: 10 },
+  dips:               { group: 'chest',      name: 'Chest dips',                     sets: 3, min: 8,  max: 12 },
+  pushup:             { group: 'chest',      name: 'Push-up',                        sets: 3, min: 10, max: 20 },
 
   db_shoulder_press:  { group: 'shoulders',  name: 'Seated dumbbell shoulder press', sets: 3, min: 8,  max: 12 },
   machine_shoulder:   { group: 'shoulders',  name: 'Machine shoulder press',         sets: 3, min: 8,  max: 12 },
   arnold_press:       { group: 'shoulders',  name: 'Arnold press',                   sets: 3, min: 8,  max: 12 },
+  barbell_ohp:        { group: 'shoulders',  name: 'Barbell overhead press',         sets: 3, min: 6,  max: 10 },
 
   cable_lateral:      { group: 'side_delts', name: 'Cable lateral raise',            sets: 3, min: 12, max: 15 },
   db_lateral:         { group: 'side_delts', name: 'Dumbbell lateral raise',         sets: 3, min: 12, max: 15 },
@@ -267,6 +303,8 @@ const EXERCISES = {
   triceps_machine:    { group: 'triceps',    name: 'Triceps extension machine',      sets: 3, min: 10, max: 15 },
   rope_pushdown:      { group: 'triceps',    name: 'Rope pushdown',                  sets: 3, min: 10, max: 15 },
   overhead_ext:       { group: 'triceps',    name: 'Overhead cable extension',       sets: 3, min: 10, max: 15 },
+  skullcrusher:       { group: 'triceps',    name: 'Skullcrusher',                   sets: 3, min: 8,  max: 12 },
+  close_grip_bench:   { group: 'triceps',    name: 'Close-grip bench press',         sets: 3, min: 8,  max: 12 },
 
   lat_pulldown:       { group: 'lats',       name: 'Lat pulldown',                   sets: 3, min: 8,  max: 12 },
   close_pulldown:     { group: 'lats',       name: 'Close-grip pulldown',            sets: 3, min: 8,  max: 12 },
@@ -277,6 +315,8 @@ const EXERCISES = {
   row_machine:        { group: 'rows',       name: 'Chest-supported row (machine)',  sets: 3, min: 8,  max: 12 },
   row_db:             { group: 'rows',       name: 'Chest-supported row (dumbbell)', sets: 3, min: 8,  max: 12 },
   single_arm_row:     { group: 'rows',       name: 'Single-arm dumbbell row',        sets: 3, min: 8,  max: 12 },
+  barbell_row:        { group: 'rows',       name: 'Barbell row',                    sets: 3, min: 6,  max: 10 },
+  tbar_row:           { group: 'rows',       name: 'T-bar row',                      sets: 3, min: 8,  max: 12 },
 
   face_pull:          { group: 'rear_delts', name: 'Cable face pull',                sets: 3, min: 12, max: 15 },
   reverse_pec_deck:   { group: 'rear_delts', name: 'Reverse pec deck',               sets: 3, min: 12, max: 15 },
@@ -286,10 +326,20 @@ const EXERCISES = {
   hammer_curl:        { group: 'biceps',     name: 'Hammer curl',                    sets: 3, min: 10, max: 15 },
   cable_curl:         { group: 'biceps',     name: 'Cable curl',                     sets: 3, min: 10, max: 15 },
   preacher_curl:      { group: 'biceps',     name: 'Preacher curl machine',          sets: 3, min: 10, max: 15 },
+  incline_curl:       { group: 'biceps',     name: 'Incline dumbbell curl',          sets: 3, min: 10, max: 15 },
+  wrist_curl:         { group: 'forearms',   name: 'Wrist curl',                     sets: 3, min: 12, max: 20 },
+  reverse_curl:       { group: 'forearms',   name: 'Reverse curl',                   sets: 3, min: 10, max: 15 },
+  db_shrug:           { group: 'traps',      name: 'Dumbbell shrug',                 sets: 3, min: 10, max: 15 },
+  pullup:             { group: 'lats',       name: 'Pull-up',                        sets: 3, min: 6,  max: 10 },
 
   leg_press:          { group: 'legs',       name: 'Leg press',                      sets: 2, min: 8,  max: 12 },
   hack_squat:         { group: 'legs',       name: 'Hack squat',                     sets: 2, min: 8,  max: 12 },
   leg_extension:      { group: 'legs',       name: 'Leg extension',                  sets: 2, min: 10, max: 15 },
+  leg_curl:           { group: 'legs',       name: 'Lying leg curl',                 sets: 2, min: 10, max: 15 },
+  rdl:                { group: 'legs',       name: 'Romanian deadlift',              sets: 2, min: 8,  max: 12 },
+  cable_crunch:       { group: 'abs',        name: 'Cable crunch',                   sets: 3, min: 10, max: 15 },
+  hanging_leg_raise:  { group: 'abs',        name: 'Hanging leg raise',              sets: 3, min: 8,  max: 15 },
+  ab_wheel:           { group: 'abs',        name: 'Ab wheel rollout',               sets: 3, min: 8,  max: 15 },
 
   calf_raise:         { group: 'calves',     name: 'Standing calf raise',            sets: 2, min: 8,  max: 12 },
   seated_calf_raise:  { group: 'calves',     name: 'Seated calf raise',              sets: 2, min: 8,  max: 12 },
@@ -317,6 +367,8 @@ const defaultState = () => ({
   swaps: {},        // 'sessionId:slotIndex' -> exercise id
   custom: {},       // exercise id -> { group, name, sets, min, max, hidden? }
   draft: {},        // exercise id -> [{ w, r }] (raw input strings)
+  extras: [],       // exercise ids added to the current workout only
+  weights: [],      // [{ date: 'YYYY-MM-DD', kg }]
   history: [],      // [{ id, date, session, exercises: [{ id, sets: [{ w, r }] }] }]
 });
 
@@ -350,12 +402,14 @@ function currentExercises() {
   if (state.legDay === session.id) {
     LEG_SLOTS.forEach((def, i) => slots.push({ key: `legs:${i}`, def }));
   }
-  return slots.map(slot => {
+  const regular = slots.map(slot => {
     const group = EXERCISES[slot.def].group;
     const options = groupExercises(group);
     const chosen = state.swaps[slot.key];
     return { key: slot.key, group, options, id: options.includes(chosen) ? chosen : slot.def };
   });
+  const extras = state.extras.map(id => ({ key: `extra:${id}`, group: exDef(id).group, options: [], id, extra: true }));
+  return regular.concat(extras);
 }
 
 // New exercise inherits sets and rep range from the one it replaces.
@@ -367,6 +421,12 @@ function addCustom(slotKey) {
   const id = `custom_${Date.now()}`;
   state.custom[id] = { group: slot.group, name, sets, min, max };
   state.swaps[slotKey] = id;
+}
+
+function pickerOptions(placeholder) {
+  return `<option value="">${placeholder}</option>` + CATEGORIES.map(([label, groups]) =>
+    `<optgroup label="${label}">${groups.flatMap(g => groupExercises(g)).map(id =>
+      `<option value="${id}">${esc(exDef(id).name)}</option>`).join('')}</optgroup>`).join('');
 }
 
 function lastLog(exId) {
@@ -416,6 +476,7 @@ function finishSession() {
   state.history.push({ id: Date.now(), date: new Date().toISOString(), session: session.id, exercises });
   state.next = (state.next + 1) % SESSIONS.length;
   state.draft = {};
+  state.extras = [];
   save();
   renderWorkout();
   window.scrollTo(0, 0);
@@ -430,6 +491,9 @@ const $history = document.getElementById('history');
 const fmtDate = iso => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtSets = sets => sets.map(s => `${s.w}×${s.r}`).join(', ');
 const esc = str => String(str).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const exName = id => exDef(id) ? exDef(id).name : id;
+const localDay = iso => { const d = new Date(iso); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const todayStr = () => localDay(new Date().toISOString());
 const sessionName = id => (SESSIONS.find(s => s.id === id) || { name: id }).name;
 
 function renderWorkout() {
@@ -447,7 +511,7 @@ function renderWorkout() {
     const flagged = last && readyForIncrease(slot.id, last.sets);
     const draft = draftFor(slot.id);
 
-    const swap = `
+    const swap = slot.extra ? `<button class="link" data-unextra="${slot.id}">Remove from this workout</button>` : `
       <select class="swap" data-swap="${slot.key}">
         <optgroup label="${GROUPS[slot.group]}">${slot.options.map(id =>
           `<option value="${id}" ${id === slot.id ? 'selected' : ''}>${esc(exDef(id).name)}</option>`).join('')}</optgroup>
@@ -496,6 +560,10 @@ function renderWorkout() {
       <select id="legDay">${legOptions}</select>
     </div>
     ${cards}
+    <div class="option">
+      <label for="addEx">Add exercise to this workout</label>
+      <select id="addEx">${pickerOptions('Choose…')}</select>
+    </div>
     <button class="primary" id="finish">Finish session</button>`;
 
   currentExercises().forEach(e => updateHint(e.id));
@@ -508,11 +576,15 @@ function updateHint(exId) {
 }
 
 function renderHistory() {
+  if (editing) return renderEdit();
   const entries = state.history.slice().reverse().map(entry => `
     <section class="card">
       <div class="entry-head">
         <h3>${sessionName(entry.session)} <span class="muted">${fmtDate(entry.date)}</span></h3>
-        <button class="link" data-delete="${entry.id}">Delete</button>
+        <span class="w-actions">
+          <button class="link" data-edit="${entry.id}">Edit</button>
+          <button class="link del" data-delete="${entry.id}">Delete</button>
+        </span>
       </div>
       ${entry.exercises.map(e =>
         `<div class="entry-line"><b>${esc(exDef(e.id) ? exDef(e.id).name : e.id)}</b><br>${fmtSets(e.sets)} kg</div>`).join('')}
@@ -526,6 +598,145 @@ function renderHistory() {
       <input type="file" id="importFile" accept="application/json" hidden>
     </div>`;
 }
+
+// ---------- Edit past workout ----------
+
+let editing = null; // { id, date, name, exercises: [{ id, sets: [{ w, r }] }] } with raw input strings
+
+function startEdit(id) {
+  const entry = state.history.find(h => String(h.id) === id);
+  editing = {
+    id: entry.id,
+    date: localDay(entry.date),
+    name: sessionName(entry.session),
+    exercises: entry.exercises.map(e => ({ id: e.id, sets: e.sets.map(s => ({ w: String(s.w), r: String(s.r) })) })),
+  };
+  renderHistory();
+  window.scrollTo(0, 0);
+}
+
+function renderEdit() {
+  const cards = editing.exercises.map((ex, ei) => `
+    <section class="card">
+      <div class="entry-head">
+        <h3>${esc(exName(ex.id))}</h3>
+        <button class="link del" data-xrem="${ei}">Remove</button>
+      </div>
+      ${ex.sets.map((s, si) => `
+        <div class="set edit-set">
+          <label>Set ${si + 1}</label>
+          <div class="field"><input type="text" inputmode="decimal" data-ei="${ei}" data-si="${si}" data-f="w" value="${esc(s.w)}"><span>kg</span></div>
+          <div class="field"><input type="text" inputmode="numeric" data-ei="${ei}" data-si="${si}" data-f="r" value="${esc(s.r)}"><span>reps</span></div>
+          <button class="link" data-srem="${ei}:${si}" aria-label="Remove set">✕</button>
+        </div>`).join('')}
+      <button class="link add-set" data-sadd="${ei}">+ Add set</button>
+    </section>`).join('');
+
+  $history.innerHTML = `
+    <h2>Edit ${esc(editing.name)}</h2>
+    <div class="option">
+      <label for="editDate">Date</label>
+      <input type="date" id="editDate" value="${editing.date}">
+    </div>
+    ${cards}
+    <div class="option">
+      <label for="editAdd">Add exercise</label>
+      <select id="editAdd">${pickerOptions('Choose…')}</select>
+    </div>
+    <button class="primary" id="editSave">Save changes</button>
+    <div class="data-actions"><button id="editCancel">Cancel</button></div>`;
+}
+
+function saveEdit() {
+  const exercises = editing.exercises
+    .map(e => ({ id: e.id, sets: e.sets.map(s => ({ w: parseNum(s.w) ?? 0, r: parseNum(s.r) })).filter(s => s.r !== null && s.r > 0) }))
+    .filter(e => e.sets.length);
+  if (!exercises.length) return toast('Log at least one set');
+
+  const entry = state.history.find(h => h.id === editing.id);
+  entry.exercises = exercises;
+  if (editing.date && editing.date !== localDay(entry.date)) {
+    entry.date = new Date(`${editing.date}T12:00`).toISOString();
+  }
+  state.history.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  state.draft = {}; // prefilled weights may depend on the edited session
+  editing = null;
+  save();
+  renderHistory();
+  toast('Workout updated');
+}
+
+// ---------- Body weight ----------
+
+const $weight = document.getElementById('weight');
+
+function weightChart(points) {
+  if (points.length < 2) return '';
+  const W = 520, H = 140, pad = 28;
+  const kgs = points.map(p => p.kg);
+  const lo = Math.min(...kgs), hi = Math.max(...kgs), span = hi - lo || 1;
+  const x = i => pad + (i * (W - pad * 2)) / (points.length - 1);
+  const y = kg => H - pad - ((kg - lo) / span) * (H - pad * 2);
+  const coords = points.map((p, i) => `${x(i).toFixed(1)},${y(p.kg).toFixed(1)}`).join(' ');
+  return `
+    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Body weight over time">
+      <polyline points="${coords}"/>
+      ${points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.kg).toFixed(1)}" r="3"/>`).join('')}
+      <text x="4" y="${y(hi) + 4}">${hi}</text>
+      <text x="4" y="${y(lo) + 4}">${lo}</text>
+    </svg>`;
+}
+
+function renderWeight() {
+  const sorted = state.weights.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  const rows = sorted.map((w, i) => {
+    const delta = i ? Math.round((w.kg - sorted[i - 1].kg) * 10) / 10 : null;
+    const deltaText = delta === null || delta === 0 ? '' : ` <span class="muted">${delta > 0 ? '+' : ''}${delta}</span>`;
+    return `
+      <div class="w-row">
+        <span>${fmtDate(`${w.date}T12:00`)}</span>
+        <span><b>${w.kg} kg</b>${deltaText}</span>
+        <span class="w-actions">
+          <button class="link" data-wedit="${w.date}">Edit</button>
+          <button class="link del" data-wdel="${w.date}">Delete</button>
+        </span>
+      </div>`;
+  }).reverse().join('');
+
+  $weight.innerHTML = `
+    <h2>Body weight</h2>
+    <div class="weight-form">
+      <input type="date" id="wDate" value="${todayStr()}">
+      <div class="field"><input type="text" inputmode="decimal" id="wKg" placeholder="${sorted.length ? sorted[sorted.length - 1].kg : ''}"><span>kg</span></div>
+    </div>
+    <button class="primary" id="wAdd">Log weight</button>
+    ${weightChart(sorted.slice(-30))}
+    <section class="card">${rows || '<p class="muted">No weigh-ins yet.</p>'}</section>`;
+}
+
+$weight.addEventListener('click', e => {
+  const { wedit, wdel } = e.target.dataset;
+  if (e.target.id === 'wAdd') {
+    const kg = parseNum(document.getElementById('wKg').value);
+    const date = document.getElementById('wDate').value;
+    if (kg === null || kg <= 0 || !date) return toast('Enter a date and weight');
+    state.weights = state.weights.filter(w => w.date !== date).concat({ date, kg });
+    save();
+    renderWeight();
+  } else if (wedit) {
+    const entry = state.weights.find(w => w.date === wedit);
+    const kg = parseNum(prompt('Weight (kg):', entry.kg));
+    if (kg === null || kg <= 0) return;
+    entry.kg = kg;
+    save();
+    renderWeight();
+  } else if (wdel) {
+    if (!confirm('Delete this weigh-in?')) return;
+    state.weights = state.weights.filter(w => w.date !== wdel);
+    save();
+    renderWeight();
+  }
+});
 
 let toastTimer;
 function toast(msg) {
@@ -544,7 +755,10 @@ document.querySelector('nav').addEventListener('click', e => {
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b === e.target));
   $workout.hidden = view !== 'workout';
   $history.hidden = view !== 'history';
-  view === 'workout' ? renderWorkout() : renderHistory();
+  $weight.hidden = view !== 'weight';
+  if (view === 'workout') renderWorkout();
+  else if (view === 'history') renderHistory();
+  else renderWeight();
 });
 
 $workout.addEventListener('input', e => {
@@ -556,7 +770,13 @@ $workout.addEventListener('input', e => {
 });
 
 $workout.addEventListener('change', e => {
-  if (e.target.id === 'legDay') {
+  if (e.target.id === 'addEx') {
+    const id = e.target.value;
+    if (!id) return;
+    if (currentExercises().some(s => s.id === id)) toast('Already in this workout');
+    else state.extras.push(id);
+    renderWorkout();
+  } else if (e.target.id === 'legDay') {
     state.legDay = e.target.value;
     renderWorkout();
   } else if (e.target.dataset.swap) {
@@ -572,6 +792,11 @@ $workout.addEventListener('click', e => {
   } else if (e.target.dataset.next !== undefined) {
     state.next = Number(e.target.dataset.next);
     renderWorkout();
+  } else if (e.target.dataset.unextra) {
+    const id = e.target.dataset.unextra;
+    state.extras = state.extras.filter(x => x !== id);
+    delete state.draft[id];
+    renderWorkout();
   } else if (e.target.dataset.remove) {
     if (!confirm('Remove this exercise from the list? Logged sessions are kept.')) return;
     state.custom[e.target.dataset.remove].hidden = true; // kept so history still shows its name
@@ -579,8 +804,32 @@ $workout.addEventListener('click', e => {
   }
 });
 
+$history.addEventListener('input', e => {
+  const { ei, si, f } = e.target.dataset;
+  if (editing && ei !== undefined) editing.exercises[ei].sets[si][f] = e.target.value;
+  else if (e.target.id === 'editDate') editing.date = e.target.value;
+});
+
 $history.addEventListener('click', e => {
-  if (e.target.dataset.delete) {
+  const d = e.target.dataset;
+  if (d.edit) {
+    startEdit(d.edit);
+  } else if (d.xrem !== undefined) {
+    editing.exercises.splice(d.xrem, 1);
+    renderEdit();
+  } else if (d.srem !== undefined) {
+    const [ei, si] = d.srem.split(':');
+    editing.exercises[ei].sets.splice(si, 1);
+    renderEdit();
+  } else if (d.sadd !== undefined) {
+    editing.exercises[d.sadd].sets.push({ w: '', r: '' });
+    renderEdit();
+  } else if (e.target.id === 'editSave') {
+    saveEdit();
+  } else if (e.target.id === 'editCancel') {
+    editing = null;
+    renderHistory();
+  } else if (d.delete) {
     if (!confirm('Delete this session?')) return;
     state.history = state.history.filter(h => String(h.id) !== e.target.dataset.delete);
     state.draft = {}; // prefilled weights may depend on the deleted session
@@ -599,6 +848,13 @@ $history.addEventListener('click', e => {
 });
 
 $history.addEventListener('change', async e => {
+  if (e.target.id === 'editAdd') {
+    const id = e.target.value;
+    if (!id) return;
+    if (editing.exercises.some(x => x.id === id)) toast('Already in this workout');
+    else editing.exercises.push({ id, sets: Array.from({ length: exDef(id).sets }, () => ({ w: '', r: '' })) });
+    return renderEdit();
+  }
   if (e.target.id !== 'importFile' || !e.target.files[0]) return;
   try {
     const data = JSON.parse(await e.target.files[0].text());
