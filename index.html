@@ -208,7 +208,14 @@ select {
 
 .data-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 
-nav button { padding: 8px 10px; }
+header { flex-wrap: wrap; }
+nav button { padding: 8px 10px; font-size: 14px; }
+
+.chart circle.pt { fill: var(--accent); }
+.stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 12px 0; }
+.stats div { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.stats b { display: block; font-size: 20px; }
+.analyze-pick { width: 100%; margin-bottom: 4px; }
 
 .edit-set { grid-template-columns: 48px 1fr 1fr 32px; }
 .edit-set .link, .add-set { color: var(--muted); }
@@ -220,8 +227,12 @@ nav button { padding: 8px 10px; }
   border: 1px solid var(--border); border-radius: 8px; font-size: 17px;
 }
 .chart { width: 100%; height: auto; margin: 12px 0; }
-.chart polyline { fill: none; stroke: var(--accent); stroke-width: 2; }
-.chart circle { fill: var(--accent); }
+.chart polyline { fill: none; stroke-linejoin: round; }
+.chart .raw { stroke: var(--muted); stroke-width: 1.5; opacity: 0.6; }
+.chart .avg { stroke: var(--accent); stroke-width: 2.5; }
+.chart circle { fill: var(--muted); }
+.legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
 .chart text { fill: var(--muted); font-size: 11px; }
 .w-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
 .w-row:last-child { border-bottom: 0; }
@@ -250,12 +261,14 @@ nav button { padding: 8px 10px; }
       <button data-view="workout" class="active">Workout</button>
       <button data-view="history">History</button>
       <button data-view="weight">Weight</button>
+      <button data-view="analyze">Analyze</button>
     </nav>
   </header>
 
   <main id="workout"></main>
   <main id="history" hidden></main>
   <main id="weight" hidden></main>
+  <main id="analyze" hidden></main>
 
   <div id="toast" hidden></div>
 
@@ -670,32 +683,45 @@ function saveEdit() {
 
 const $weight = document.getElementById('weight');
 
+// Mean of all weigh-ins within the 7 calendar days ending on each entry's date.
+function rollingAvg(sorted) {
+  const day = w => Date.parse(`${w.date}T12:00`) / 86400000;
+  return sorted.map((w, i) => {
+    const window = sorted.slice(0, i + 1).filter(x => day(w) - day(x) < 7);
+    return Math.round((window.reduce((sum, x) => sum + x.kg, 0) / window.length) * 10) / 10;
+  });
+}
+
 function weightChart(points) {
   if (points.length < 2) return '';
   const W = 520, H = 140, pad = 28;
-  const kgs = points.map(p => p.kg);
+  const kgs = points.flatMap(p => [p.kg, p.avg]);
   const lo = Math.min(...kgs), hi = Math.max(...kgs), span = hi - lo || 1;
   const x = i => pad + (i * (W - pad * 2)) / (points.length - 1);
   const y = kg => H - pad - ((kg - lo) / span) * (H - pad * 2);
   const coords = points.map((p, i) => `${x(i).toFixed(1)},${y(p.kg).toFixed(1)}`).join(' ');
+  const avgCoords = points.map((p, i) => `${x(i).toFixed(1)},${y(p.avg).toFixed(1)}`).join(' ');
   return `
     <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Body weight over time">
-      <polyline points="${coords}"/>
+      <polyline class="raw" points="${coords}"/>
+      <polyline class="avg" points="${avgCoords}"/>
       ${points.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.kg).toFixed(1)}" r="3"/>`).join('')}
       <text x="4" y="${y(hi) + 4}">${hi}</text>
       <text x="4" y="${y(lo) + 4}">${lo}</text>
-    </svg>`;
+    </svg>
+    <div class="legend"><span><i style="background:var(--muted)"></i>Weigh-in</span><span><i style="background:var(--accent)"></i>7-day average</span></div>`;
 }
 
 function renderWeight() {
   const sorted = state.weights.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+  const avgs = rollingAvg(sorted);
   const rows = sorted.map((w, i) => {
     const delta = i ? Math.round((w.kg - sorted[i - 1].kg) * 10) / 10 : null;
     const deltaText = delta === null || delta === 0 ? '' : ` <span class="muted">${delta > 0 ? '+' : ''}${delta}</span>`;
     return `
       <div class="w-row">
         <span>${fmtDate(`${w.date}T12:00`)}</span>
-        <span><b>${w.kg} kg</b>${deltaText}</span>
+        <span><b>${w.kg} kg</b>${deltaText} <span class="muted">avg ${avgs[i]}</span></span>
         <span class="w-actions">
           <button class="link" data-wedit="${w.date}">Edit</button>
           <button class="link del" data-wdel="${w.date}">Delete</button>
@@ -710,7 +736,8 @@ function renderWeight() {
       <div class="field"><input type="text" inputmode="decimal" id="wKg" placeholder="${sorted.length ? sorted[sorted.length - 1].kg : ''}"><span>kg</span></div>
     </div>
     <button class="primary" id="wAdd">Log weight</button>
-    ${weightChart(sorted.slice(-30))}
+    ${sorted.length ? `<p class="muted">7-day average: <b>${avgs[avgs.length - 1]} kg</b></p>` : ''}
+    ${weightChart(sorted.map((w, i) => ({ ...w, avg: avgs[i] })).slice(-30))}
     <section class="card">${rows || '<p class="muted">No weigh-ins yet.</p>'}</section>`;
 }
 
@@ -738,6 +765,170 @@ $weight.addEventListener('click', e => {
   }
 });
 
+// ---------- Analyze (per-exercise progression) ----------
+
+const $analyze = document.getElementById('analyze');
+
+const r1 = n => Math.round(n * 10) / 10;
+const METRICS = {
+  e1rm:   { label: 'Strength',   unit: 'kg',   value: sets => r1(Math.max(...sets.map(s => s.w * (1 + s.r / 30)))) }, // Epley est. 1RM
+  top:    { label: 'Top weight', unit: 'kg',   value: sets => Math.max(...sets.map(s => s.w)) },
+  volume: { label: 'Volume',     unit: 'kg',   value: sets => r1(sets.reduce((sum, s) => sum + s.w * s.r, 0)) },
+  reps:   { label: 'Total reps', unit: 'reps', value: sets => sets.reduce((sum, s) => sum + s.r, 0) },
+};
+
+const ALL = '__all';
+let analyzeEx = null;
+let analyzeMetric = 'e1rm';
+
+function exerciseSeries(exId) {
+  return state.history
+    .filter(h => h.exercises.some(e => e.id === exId))
+    .map(h => ({ date: h.date, sets: h.exercises.find(e => e.id === exId).sets }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
+// Overall strength index: each exercise is scored as % of its first-ever est. 1RM (start = 100),
+// and each session gets the mean score of the exercises in it. Weight and reps both count via est. 1RM.
+// Only exercises with weight logged in 2+ sessions take part, so one-offs don't dilute the average.
+function overallProgress() {
+  const history = state.history.slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const e1rm = sets => METRICS.e1rm.value(sets);
+  const base = {}, count = {}, latest = {};
+  history.forEach(h => h.exercises.forEach(e => {
+    count[e.id] = (count[e.id] || 0) + 1;
+    if (!(e.id in base)) base[e.id] = e1rm(e.sets);
+    latest[e.id] = e1rm(e.sets);
+  }));
+  const eligible = id => base[id] > 0 && count[id] >= 2;
+
+  const series = [];
+  history.forEach(h => {
+    const scores = h.exercises.filter(e => eligible(e.id)).map(e => (e1rm(e.sets) / base[e.id]) * 100);
+    if (scores.length) series.push({ date: h.date, n: scores.length, v: r1(scores.reduce((a, b) => a + b, 0) / scores.length) });
+  });
+  const perExercise = Object.keys(base).filter(eligible)
+    .map(id => ({ id, pct: r1((latest[id] / base[id] - 1) * 100) }))
+    .sort((a, b) => b.pct - a.pct);
+  return { series, perExercise };
+}
+
+function renderOverall(picker) {
+  const { series, perExercise } = overallProgress();
+  if (!series.length) {
+    $analyze.innerHTML = `<h2>Progress</h2>${picker}
+      <p class="muted">Overall needs at least one exercise with weight logged in 2+ sessions.</p>`;
+    return;
+  }
+  const latest = series[series.length - 1].v;
+  const best = Math.max(...series.map(p => p.v));
+  const change = r1(latest - 100);
+  const signed = n => `${n > 0 ? '+' : ''}${n}%`;
+
+  $analyze.innerHTML = `
+    <h2>Progress</h2>
+    ${picker}
+    <div class="stats">
+      <div><span class="muted">Strength index</span><b>${latest}</b></div>
+      <div><span class="muted">Best</span><b>${best}</b></div>
+      <div><span class="muted">Overall change</span><b>${signed(change)}</b></div>
+      <div><span class="muted">Exercises tracked</span><b>${perExercise.length}</b></div>
+    </div>
+    ${progressChart(series, 'index')}
+    <p class="muted">Index = average of each exercise's est. 1RM as % of its first logged session (100 = where you started). Bodyweight-only exercises are left out.</p>
+    <section class="card">${perExercise.map(p => `
+      <div class="w-row"><span>${esc(exName(p.id))}</span><b>${signed(p.pct)}</b></div>`).join('')}</section>`;
+}
+
+function analyzePicker(loggedIds) {
+  const placed = new Set();
+  const groups = CATEGORIES.map(([label, muscles]) => {
+    const ids = [...loggedIds].filter(id => muscles.includes(exDef(id)?.group));
+    ids.forEach(id => placed.add(id));
+    return [label, ids];
+  });
+  const rest = [...loggedIds].filter(id => !placed.has(id));
+  if (rest.length) groups.push(['Other', rest]);
+  const overall = `<option value="${ALL}" ${analyzeEx === ALL ? 'selected' : ''}>★ Overall (all exercises)</option>`;
+  return overall + groups.filter(([, ids]) => ids.length).map(([label, ids]) =>
+    `<optgroup label="${label}">${ids.map(id =>
+      `<option value="${id}" ${id === analyzeEx ? 'selected' : ''}>${esc(exName(id))}</option>`).join('')}</optgroup>`).join('');
+}
+
+function progressChart(points, unit) {
+  const W = 520, H = 160, pad = 30;
+  const vals = points.map(p => p.v);
+  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const x = i => pad + (points.length === 1 ? (W - pad * 2) / 2 : (i * (W - pad * 2)) / (points.length - 1));
+  const y = v => H - pad - ((v - lo) / span) * (H - pad * 2);
+  const last = points.length - 1;
+  return `
+    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Progression chart">
+      ${points.length > 1 ? `<polyline class="avg" points="${points.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>` : ''}
+      ${points.map((p, i) => `<circle class="pt" cx="${x(i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="4"><title>${fmtDate(p.date)}: ${p.v} ${unit}</title></circle>`).join('')}
+      <text x="4" y="${y(hi) + 4}">${hi}</text>
+      ${hi !== lo ? `<text x="4" y="${y(lo) + 4}">${lo}</text>` : ''}
+      <text x="${pad}" y="${H - 6}">${fmtDate(points[0].date)}</text>
+      ${last ? `<text x="${W - pad}" y="${H - 6}" text-anchor="end">${fmtDate(points[last].date)}</text>` : ''}
+    </svg>`;
+}
+
+function renderAnalyze() {
+  const latestFirst = state.history.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  const logged = new Set(latestFirst.flatMap(h => h.exercises.map(e => e.id)));
+  if (!logged.size) {
+    $analyze.innerHTML = '<h2>Progress</h2><p class="muted">Log a workout to see progression per exercise.</p>';
+    return;
+  }
+  if (analyzeEx !== ALL && !logged.has(analyzeEx)) analyzeEx = latestFirst[0].exercises[0].id;
+  if (analyzeEx === ALL) {
+    return renderOverall(`<select class="analyze-pick" id="anEx">${analyzePicker(logged)}</select>`);
+  }
+
+  const metric = METRICS[analyzeMetric];
+  const series = exerciseSeries(analyzeEx).map(p => ({ date: p.date, sets: p.sets, v: metric.value(p.sets) }));
+  const first = series[0].v, latest = series[series.length - 1].v;
+  const best = Math.max(...series.map(p => p.v));
+  const change = r1(latest - first);
+  const pct = first > 0 ? ` (${change >= 0 ? '+' : ''}${r1((latest / first - 1) * 100)}%)` : '';
+
+  const tabs = Object.entries(METRICS).map(([key, m]) =>
+    `<button data-metric="${key}" class="${key === analyzeMetric ? 'next' : ''}">${m.label}</button>`).join('');
+
+  const rows = series.slice().reverse().map(p => `
+    <div class="w-row">
+      <span>${fmtDate(p.date)}</span>
+      <span class="muted">${fmtSets(p.sets)}</span>
+      <b>${p.v} ${metric.unit}</b>
+    </div>`).join('');
+
+  $analyze.innerHTML = `
+    <h2>Progress</h2>
+    <select class="analyze-pick" id="anEx">${analyzePicker(logged)}</select>
+    <div class="rotation">${tabs}</div>
+    <div class="stats">
+      <div><span class="muted">Latest</span><b>${latest} ${metric.unit}</b></div>
+      <div><span class="muted">Best</span><b>${best} ${metric.unit}</b></div>
+      <div><span class="muted">Change since first</span><b>${change > 0 ? '+' : ''}${change} ${metric.unit}</b><span class="muted">${pct.trim()}</span></div>
+      <div><span class="muted">Sessions</span><b>${series.length}</b></div>
+    </div>
+    ${progressChart(series, metric.unit)}
+    ${analyzeMetric === 'e1rm' ? '<p class="muted">Strength blends weight and reps into one number: the heaviest weight you could lift once, estimated from your best set as weight × (1 + reps / 30). It rises when either weight or reps go up.</p>' : ''}
+    <section class="card">${rows}</section>`;
+}
+
+$analyze.addEventListener('change', e => {
+  if (e.target.id !== 'anEx') return;
+  analyzeEx = e.target.value;
+  renderAnalyze();
+});
+
+$analyze.addEventListener('click', e => {
+  if (!e.target.dataset.metric) return;
+  analyzeMetric = e.target.dataset.metric;
+  renderAnalyze();
+});
+
 let toastTimer;
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -756,9 +947,11 @@ document.querySelector('nav').addEventListener('click', e => {
   $workout.hidden = view !== 'workout';
   $history.hidden = view !== 'history';
   $weight.hidden = view !== 'weight';
+  $analyze.hidden = view !== 'analyze';
   if (view === 'workout') renderWorkout();
   else if (view === 'history') renderHistory();
-  else renderWeight();
+  else if (view === 'weight') renderWeight();
+  else renderAnalyze();
 });
 
 $workout.addEventListener('input', e => {
